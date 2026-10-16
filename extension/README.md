@@ -1,36 +1,53 @@
-# Probar Manual HU en Chrome — MVP 0.4
+# Probar Manual HU en Chrome — MVP 0.6
 
-1. Descarga el repositorio desde https://github.com/fulgencio-09/manual/tree/mvp/chrome-recorder (Code → Download ZIP) o clónalo con Git.
-2. Descomprime el repositorio y localiza la carpeta `extension`.
-3. Abre Google Chrome y navega a `chrome://extensions`.
-4. Activa **Modo de desarrollador**.
-5. Pulsa **Cargar descomprimida** y selecciona la carpeta `extension`.
-6. Abre una página HTTP/HTTPS de prueba y recárgala después de instalar o actualizar la extensión.
-7. Pulsa el icono Manual HU. Escribe un ID como `HU-001` y un título como `Probar registro de pasos`.
-8. Pulsa **Iniciar grabación**. La ventana emergente puede cerrarse; la barra **Manual HU** queda dentro de la página.
-9. Realiza acciones con datos ficticios. La barra puede moverse arrastrando la zona **Manual HU**.
-10. La versión 0.4 intenta capturar una evidencia de pantalla después de cada paso registrado.
-11. Pulsa **Finalizar y exportar** desde la barra.
-12. Deben generarse dos archivos: `HU-001-ejecucion.json` y `HU-001-manual.html`.
+## 1. Instalar la extensión
 
-## Qué validar
+1. Usa la rama `mvp/doc-output` del repositorio.
+2. Abre Google Chrome y navega a `chrome://extensions`.
+3. Activa **Modo de desarrollador**.
+4. Pulsa **Cargar descomprimida** y selecciona la carpeta `extension`.
+5. Después de actualizar la extensión, recarga la página web donde realizarás la prueba.
 
-- El JSON debe tener `schemaVersion: 1.2`, `story`, `steps` y `evidences`.
-- Cada paso debe tener `humanAction` en lenguaje entendible.
-- No deberían aparecer pasos genéricos sobre `html` o `body`.
-- El HTML debe mostrar el procedimiento y, cuando la captura fue posible, una imagen de evidencia debajo del paso.
-- Si una captura no pudo realizarse, el paso sigue apareciendo sin imagen.
+## 2. Activar el generador PDF
 
-## Si no registra nada
+Desde `tools/manual-generator` ejecuta una vez:
 
-- Confirma que seleccionaste la carpeta `extension`, no la raíz del repositorio.
-- Recarga la página web después de instalar o actualizar la extensión.
-- Prueba en una página web común; Chrome no permite insertar scripts en páginas internas `chrome://`.
-- Revisa `chrome://extensions` → Manual HU → **Errores**.
-- Si las evidencias no aparecen, revisa los errores del service worker desde `chrome://extensions` → Manual HU → **service worker** → Inspeccionar.
+```bash
+npm install
+npx playwright install chromium
+npm run server
+```
+
+La terminal debe quedar abierta. El servicio local atiende en `http://127.0.0.1:8787`.
+
+## 3. Grabar una historia de usuario
+
+1. Abre el sistema HTTP/HTTPS que deseas documentar.
+2. Pulsa el icono **Manual HU**.
+3. Escribe el ID de la historia, por ejemplo `HU-001`, y su título.
+4. Pulsa **Iniciar grabación**.
+5. Ejecuta normalmente la historia de usuario.
+6. La barra **Manual HU** registra los pasos y captura evidencias de pantalla.
+7. Al terminar, pulsa **Finalizar y exportar**.
+
+### Resultado esperado
+
+El resultado final debe ser un archivo:
+
+```text
+HU-001-manual.pdf
+```
+
+Chrome abrirá el selector de ubicación de descarga porque la extensión usa el permiso de descargas con `saveAs: true`.
+
+## 4. Si no aparece el PDF
+
+- Verifica que `npm run server` siga ejecutándose.
+- Verifica que aparezca `Manual HU PDF server activo en http://127.0.0.1:8787` en la terminal.
+- En `chrome://extensions` revisa **Errores** y el **service worker** de Manual HU.
+- Recarga la página después de actualizar la extensión.
+- Prueba primero con datos ficticios.
 
 ## Datos y privacidad
 
-El prototipo no guarda el contenido escrito en los campos y excluye campos sensibles reconocidos. Las evidencias son capturas de pantalla de la pestaña durante la ejecución y pueden contener información visible en ella. Por eso esta versión debe probarse únicamente con datos ficticios o un entorno autorizado. No se recomienda usarla todavía con historias clínicas, credenciales, datos personales o información productiva.
-
-Las evidencias se almacenan temporalmente en `chrome.storage.local` hasta finalizar la ejecución y se eliminan después de generar los archivos. El límite del prototipo es de 40 evidencias por ejecución.
+El grabador no almacena el contenido digitado en los campos y excluye campos sensibles reconocidos. Las evidencias son capturas visibles de la pestaña y pueden contener información que aparezca en pantalla. Esta versión debe utilizarse en ambientes autorizados y preferiblemente con datos ficticios durante las pruebas.

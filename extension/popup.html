@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual HU</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="brand-mark">MH</div>
+      <div><h1>Manual HU</h1><p>Grabador de ejecución · MVP 0.1</p></div>
+    </header>
+
+    <label for="storyId">Historia de usuario</label>
+    <input id="storyId" type="text" maxlength="80" placeholder="Ej. HU-025">
+
+    <label for="storyTitle">Título de la historia</label>
+    <input id="storyTitle" type="text" maxlength="160" placeholder="Ej. Registrar factura">
+
+    <section class="status-card">
+      <span id="statusDot" class="dot"></span>
+      <div><strong id="statusText">Grabación detenida</strong><small id="stepCount">0 pasos registrados</small></div>
+    </section>
+
+    <div class="actions">
+      <button id="startBtn" class="primary">Iniciar grabación</button>
+      <button id="pauseBtn" disabled>Pausar</button>
+      <button id="finishBtn" class="dark">Finalizar y exportar JSON</button>
+    </div>
+    <button id="clearBtn" class="link">Limpiar esta ejecución</button>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <footer>Registra acciones observadas. No guarda contraseñas ni envía datos a un servidor.</footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

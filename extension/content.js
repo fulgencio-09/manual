@@ -124,27 +124,57 @@
     toolbar = null;
   }
 
-  function finishAndExport() {
-    if (!recording) return;
-    recording = false;
-    paused = false;
-    const report = {
-      schemaVersion: '1.1',
-      product: 'Manual HU Chrome Recorder',
-      story,
-      startedAt: steps[0]?.timestamp || new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
-      steps
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function downloadText(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (story.id.replace(/[^a-z0-9_-]/gi, '_') || 'historia') + '-ejecucion.json';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function buildManualHtml() {
+    const rows = steps.map((item) => `
+      <article class="step">
+        <div class="step-number">${item.step}</div>
+        <div class="step-body">
+          <h3>${escapeHtml(item.humanAction || item.detail)}</h3>
+          <p>${escapeHtml(item.detail)}</p>
+          <div class="meta">Pantalla: ${escapeHtml(item.pageTitle)} · Elemento: ${escapeHtml(item.element)} · Acción: ${escapeHtml(item.action)}</div>
+        </div>
+      </article>`).join('');
+
+    return `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(story.id + ' - ' + story.title)}</title>
+<style>body{font-family:Arial,sans-serif;background:#f5f7fb;color:#172033;margin:0}.page{max-width:980px;margin:0 auto;background:#fff;min-height:100vh;padding:42px 52px;box-sizing:border-box}.cover{border-bottom:3px solid #0e7490;padding-bottom:26px;margin-bottom:30px}.tag{display:inline-block;background:#e6f4f7;color:#0e7490;padding:6px 10px;border-radius:6px;font-weight:700;font-size:12px}.cover h1{font-size:30px;margin:14px 0 8px}.muted{color:#667085}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0 32px}.card{border:1px solid #e4e7ec;border-radius:9px;padding:14px}.card b{display:block;font-size:20px}.step{display:flex;gap:16px;border:1px solid #e4e7ec;border-radius:10px;padding:16px;margin:12px 0;break-inside:avoid}.step-number{width:34px;height:34px;border-radius:50%;background:#0e7490;color:#fff;display:grid;place-items:center;font-weight:700;flex:0 0 auto}.step h3{margin:0 0 7px;font-size:16px}.step p{margin:0 0 8px;color:#475467}.meta{font-size:11px;color:#667085}.footer{margin-top:35px;padding-top:14px;border-top:1px solid #e4e7ec;font-size:11px;color:#667085}@media print{body{background:#fff}.page{padding:20px;max-width:none}.step{box-shadow:none}}</style></head>
+<body><main class="page"><section class="cover"><span class="tag">MANUAL DE USUARIO · BORRADOR</span><h1>${escapeHtml(story.title || 'Historia de usuario')}</h1><p class="muted">Historia de usuario: <b>${escapeHtml(story.id)}</b></p></section>
+<div class="summary"><div class="card"><span class="muted">Pasos registrados</span><b>${steps.length}</b></div><div class="card"><span class="muted">Inicio</span><b>${escapeHtml(steps[0]?.timestamp || '-')}</b></div><div class="card"><span class="muted">Fin</span><b>${escapeHtml(new Date().toISOString())}</b></div></div>
+<h2>Procedimiento</h2>${rows || '<p>No se registraron pasos.</p>'}<div class="footer">Documento generado automáticamente por Manual HU. Este documento es un borrador generado a partir de la ejecución registrada y debe ser revisado antes de publicarse.</div></main></body></html>`;
+  }
+
+  function finishAndExport() {
+    if (!recording) return;
+    recording = false;
+    paused = false;
+    const finishedAt = new Date().toISOString();
+    const report = {
+      schemaVersion: '1.1',
+      product: 'Manual HU Chrome Recorder',
+      story,
+      startedAt: steps[0]?.timestamp || finishedAt,
+      finishedAt,
+      steps
+    };
+    const baseName = (story.id.replace(/[^a-z0-9_-]/gi, '_') || 'historia');
+    downloadText(baseName + '-ejecucion.json', JSON.stringify(report, null, 2), 'application/json;charset=utf-8');
+    downloadText(baseName + '-manual.html', buildManualHtml(), 'text/html;charset=utf-8');
     removeToolbar();
     chrome.runtime.sendMessage({ type: 'MANUAL_HU_FINISHED', count: steps.length }).catch(() => {});
   }

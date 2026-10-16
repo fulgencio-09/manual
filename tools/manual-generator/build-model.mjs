@@ -39,14 +39,34 @@ export function loadModel(sourcePath, aiPath = null) {
         evidenceStep: step.step,
       }));
 
+  const metadata = source.metadata || source.document?.metadata || {};
   const document = ai?.document || {};
   const execution = ai?.execution || {};
   const review = ai?.review || {};
   const sourceResult = source.execution?.result;
+  const firstPageUrl = steps.find((step) => step.pageUrl)?.pageUrl;
 
   return {
     schemaVersion: text(source.schemaVersion),
     story: source.story || {},
+    metadata: {
+      process: text(metadata.process),
+      dependency: text(metadata.dependency),
+      issueDate: text(metadata.issueDate),
+      classification: text(metadata.classification),
+      systemName: text(metadata.systemName),
+      module: text(metadata.module),
+      systemVersion: text(metadata.systemVersion),
+      accessUrl: text(metadata.accessUrl, firstPageUrl || 'No especificado'),
+      network: text(metadata.network),
+      authentication: text(metadata.authentication),
+      elaboratedBy: text(metadata.elaboratedBy),
+      reviewedBy: text(metadata.reviewedBy),
+      approvedBy: text(metadata.approvedBy),
+      elaboratedRole: text(metadata.elaboratedRole),
+      reviewedRole: text(metadata.reviewedRole),
+      approvedRole: text(metadata.approvedRole),
+    },
     startedAt: source.startedAt,
     finishedAt: source.finishedAt,
     steps,

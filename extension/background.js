@@ -12,6 +12,13 @@ async function setRun(run) {
   await chrome.storage.local.set({ [RUN_KEY]: run });
 }
 
+async function setEvidenceVisibility(tabId, hidden) {
+  if (!tabId) return;
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_EVIDENCE_VISIBILITY', hidden });
+  } catch (_) {}
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message?.type === 'MANUAL_HU_START_RUN') {
@@ -34,15 +41,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       captureQueue = captureQueue.then(async () => {
         await new Promise(resolve => setTimeout(resolve, 300));
         const latestRun = await getRun();
-        const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'jpeg', quality: JPEG_QUALITY });
-        latestRun.tabId = sender.tab.id;
-        latestRun.evidences = [...(latestRun.evidences || []), {
-          step: message.step?.step,
-          timestamp: message.step?.timestamp || new Date().toISOString(),
-          pageTitle: message.step?.pageTitle || '',
-          dataUrl
-        }];
-        await setRun(latestRun);
+        await setEvidenceVisibility(sender.tab.id, true);
+        await new Promise(resolve => setTimeout(resolve, 60));
+        try {
+          const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: 'jpeg', quality: JPEG_QUALITY });
+          latestRun.tabId = sender.tab.id;
+          latestRun.evidences = [...(latestRun.evidences || []), {
+            step: message.step?.step,
+            timestamp: message.step?.timestamp || new Date().toISOString(),
+            pageTitle: message.step?.pageTitle || '',
+            dataUrl
+          }];
+          await setRun(latestRun);
+        } finally {
+          await setEvidenceVisibility(sender.tab.id, false);
+        }
       });
 
       try {

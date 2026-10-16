@@ -84,6 +84,17 @@ async function generatePdf(run) {
   });
 }
 
+chrome.downloads.onCreated.addListener(async item => {
+  const filename = String(item.filename || '').toLowerCase();
+  if (!filename.endsWith('-ejecucion.json') && !filename.endsWith('-manual.html')) return;
+  try {
+    if (item.state === 'in_progress') await chrome.downloads.cancel(item.id);
+  } catch (_) {}
+  try {
+    await chrome.downloads.erase({ id: item.id });
+  } catch (_) {}
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message?.type === 'MANUAL_HU_START_RUN') {

@@ -17,6 +17,18 @@ npm install
 npx playwright install chromium
 ```
 
+## PDF directo desde Chrome
+
+El grabador de Chrome puede entregar el PDF automáticamente al pulsar **Finalizar y exportar**. Para ello debe estar activo el servicio local de generación:
+
+```bash
+npm run server
+```
+
+El servicio queda disponible en `http://127.0.0.1:8787` y recibe la ejecución en `POST /generate-pdf`. La extensión no necesita conocer ni almacenar credenciales de IA para este proceso.
+
+> Mantenga esta terminal abierta mientras realice las grabaciones. Si el servicio no está activo, la extensión no podrá generar el PDF automáticamente.
+
 ## Uso directo
 
 ```bash

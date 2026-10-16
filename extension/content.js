@@ -6,7 +6,6 @@
   let paused = false;
   let steps = [];
   let story = { id: '', title: '' };
-  let lastInputAt = new WeakMap();
   let toolbar = null;
 
   const sensitiveSelector = [
@@ -27,40 +26,60 @@
     const name = (el.getAttribute('name') || '').toLowerCase();
     const id = (el.id || '').toLowerCase();
     const autocomplete = (el.getAttribute('autocomplete') || '').toLowerCase();
-    return ['password','hidden'].includes(type) ||
+    return ['password', 'hidden'].includes(type) ||
       /pass(word)?|token|secret|credit.?card|cvv|cvc|ssn|documento|historia.?clinica/i.test(name + ' ' + id) ||
-      ['current-password','new-password','cc-number','cc-csc','one-time-code'].includes(autocomplete);
+      ['current-password', 'new-password', 'cc-number', 'cc-csc', 'one-time-code'].includes(autocomplete);
   }
 
   function labelFor(el) {
     if (!(el instanceof Element)) return '';
     const aria = el.getAttribute('aria-label') || el.getAttribute('title');
-    if (aria) return aria.trim().slice(0, 120);
+    if (aria) return aria.trim().replace(/\s+/g, ' ').slice(0, 120);
     if (el.id) {
       const label = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
-      if (label?.innerText) return label.innerText.trim().slice(0, 120);
+      if (label?.innerText) return label.innerText.trim().replace(/\s+/g, ' ').slice(0, 120);
     }
     const wrappingLabel = el.closest('label')?.innerText;
-    if (wrappingLabel) return wrappingLabel.trim().slice(0, 120);
-    return (el.innerText || el.getAttribute('placeholder') || el.tagName)
-      .toString().trim().replace(/\s+/g, ' ').slice(0, 120);
+    if (wrappingLabel) return wrappingLabel.trim().replace(/\s+/g, ' ').slice(0, 120);
+    const placeholder = el.getAttribute('placeholder');
+    if (placeholder) return placeholder.trim().replace(/\s+/g, ' ').slice(0, 120);
+    const text = el.innerText || '';
+    if (text.trim()) return text.trim().replace(/\s+/g, ' ').slice(0, 120);
+    return el.tagName.toLowerCase();
   }
 
-  function addStep(kind, target, detail = '') {
+  function selectorHint(el) {
+    if (!(el instanceof Element)) return '';
+    const parts = [];
+    let current = el;
+    for (let i = 0; i < 3 && current && current !== document.body; i++, current = current.parentElement) {
+      let part = current.tagName.toLowerCase();
+      if (current.id) part += '#' + current.id;
+      else if (typeof current.className === 'string' && current.className.trim()) {
+        part += '.' + current.className.trim().split(/\s+/).slice(0, 2).join('.');
+      }
+      parts.unshift(part);
+    }
+    return parts.join(' > ').slice(0, 240);
+  }
+
+  function addStep(action, target, detail = '', humanAction = '') {
     if (!recording || paused) return;
     const el = target instanceof Element ? target : null;
+    if (!el || el === document.documentElement || el === document.body) return;
     const now = new Date().toISOString();
-    const path = el ? [el.tagName.toLowerCase(), el.id ? '#' + el.id : '', typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0,2).join('.') : ''].join('') : '';
+    const element = labelFor(el);
     steps.push({
       step: steps.length + 1,
       timestamp: now,
-      action: kind,
+      action,
+      humanAction: humanAction || detail,
       pageTitle: document.title.slice(0, 160),
       pageUrl: location.origin + location.pathname,
-      element: el ? labelFor(el) : '',
-      elementType: el ? (el.getAttribute('type') || el.tagName.toLowerCase()).slice(0,40) : '',
-      selectorHint: path.slice(0,160),
-      detail: detail.slice(0,240)
+      element: element.slice(0, 120),
+      elementType: (el.getAttribute('type') || el.tagName.toLowerCase()).slice(0, 40),
+      selectorHint: selectorHint(el),
+      detail: detail.slice(0, 240)
     });
     updateToolbar();
   }
@@ -69,18 +88,10 @@
     if (toolbar) toolbar.remove();
     toolbar = document.createElement('div');
     toolbar.id = 'manual-hu-toolbar';
-    toolbar.innerHTML = `
-      <div class="mhu-title"><b>● Manual HU</b><span id="mhu-story"></span></div>
-      <div class="mhu-status"><span id="mhu-status">Grabando</span><span id="mhu-count">0 pasos</span></div>
-      <button id="mhu-pause" type="button">Pausar</button>
-      <button id="mhu-finish" type="button">Finalizar y exportar</button>
-    `;
     const shadow = toolbar.attachShadow({ mode: 'open' });
     shadow.innerHTML = `
       <style>
-        :host{all:initial}
-        .box{position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#172033;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:12px;display:flex;align-items:center;gap:10px;}
-        .title{display:flex;flex-direction:column;gap:3px;min-width:145px}.title b{font-size:13px}.story{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}.status{display:flex;flex-direction:column;gap:3px;min-width:78px}.status span:first-child{font-weight:700}.status span:last-child{opacity:.7}.active{color:#86efac}.paused{color:#fbbf24}.box button{border:0;border-radius:7px;padding:8px 10px;font-weight:700;cursor:pointer;font-size:11px}.pause{background:#334155;color:white}.finish{background:#0e7490;color:white}.box button:hover{filter:brightness(1.1)}
+        :host{all:initial}.box{position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#172033;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:12px;display:flex;align-items:center;gap:10px}.title{display:flex;flex-direction:column;gap:3px;min-width:145px}.title b{font-size:13px}.story{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}.status{display:flex;flex-direction:column;gap:3px;min-width:78px}.status span:first-child{font-weight:700}.status span:last-child{opacity:.7}.active{color:#86efac}.paused{color:#fbbf24}.box button{border:0;border-radius:7px;padding:8px 10px;font-weight:700;cursor:pointer;font-size:11px}.pause{background:#334155;color:white}.finish{background:#0e7490;color:white}.box button:hover{filter:brightness(1.1)}
       </style>
       <div class="box">
         <div class="title"><b>● Manual HU</b><span class="story"></span></div>
@@ -89,17 +100,16 @@
         <button class="finish" type="button">Finalizar y exportar</button>
       </div>`;
     document.documentElement.appendChild(toolbar);
-    const root = shadow;
-    root.querySelector('.story').textContent = story.id + ' · ' + story.title;
-    root.querySelector('.pause').addEventListener('click', (e) => {
-      e.stopPropagation();
+    shadow.querySelector('.story').textContent = story.id + ' · ' + story.title;
+    shadow.querySelector('.pause').addEventListener('click', (event) => {
+      event.stopPropagation();
       paused = !paused;
-      root.querySelector('.pause').textContent = paused ? 'Reanudar' : 'Pausar';
-      root.querySelector('.status-text').textContent = paused ? 'Pausado' : 'Grabando';
-      root.querySelector('.status-text').className = paused ? 'paused status-text' : 'active status-text';
+      shadow.querySelector('.pause').textContent = paused ? 'Reanudar' : 'Pausar';
+      shadow.querySelector('.status-text').textContent = paused ? 'Pausado' : 'Grabando';
+      shadow.querySelector('.status-text').className = paused ? 'paused status-text' : 'active status-text';
     });
-    root.querySelector('.finish').addEventListener('click', (e) => {
-      e.stopPropagation();
+    shadow.querySelector('.finish').addEventListener('click', (event) => {
+      event.stopPropagation();
       finishAndExport();
     });
   }
@@ -119,7 +129,7 @@
     recording = false;
     paused = false;
     const report = {
-      schemaVersion: '1.0',
+      schemaVersion: '1.1',
       product: 'Manual HU Chrome Recorder',
       story,
       startedAt: steps[0]?.timestamp || new Date().toISOString(),
@@ -142,10 +152,22 @@
   document.addEventListener('click', (event) => {
     if (!recording || paused) return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('#manual-hu-toolbar')) return;
-    const clickable = target?.closest('button,a,input[type="button"],input[type="submit"],[role="button"],[role="tab"],[role="menuitem"]') || target;
+    if (!target || target === document.documentElement || target === document.body) return;
+    if (target.closest('#manual-hu-toolbar')) return;
+
+    const formControl = target.closest('input,textarea,select');
+    if (formControl) {
+      const type = (formControl.getAttribute('type') || '').toLowerCase();
+      if (['checkbox', 'radio'].includes(type)) return;
+      return;
+    }
+
+    const clickable = target.closest('button,a,[role="button"],[role="tab"],[role="menuitem"],[role="option"]');
+    if (!clickable) return;
     if (isSensitive(clickable)) return;
-    addStep('click', clickable, labelFor(clickable) || 'Clic en elemento');
+
+    const label = labelFor(clickable) || 'elemento';
+    addStep('click', clickable, 'Clic realizado sobre ' + label + '.', 'Hacer clic en "' + label + '".');
   }, true);
 
   document.addEventListener('change', (event) => {
@@ -154,30 +176,27 @@
     if (!(target instanceof Element) || target.closest('#manual-hu-toolbar') || isSensitive(target)) return;
     const tag = target.tagName.toLowerCase();
     const type = (target.getAttribute('type') || '').toLowerCase();
+    const label = labelFor(target) || 'campo';
     let detail = '';
+    let humanAction = '';
+
     if (tag === 'select') {
       const option = target.selectedOptions?.[0];
-      detail = option ? 'Opción seleccionada: ' + (option.textContent || '').trim().slice(0,100) : 'Selección cambiada';
+      const optionText = option ? (option.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 100) : '';
+      detail = optionText ? 'Opción seleccionada: ' + optionText : 'Selección cambiada';
+      humanAction = optionText ? 'Seleccionar "' + optionText + '" en "' + label + '".' : 'Cambiar la selección de "' + label + '".';
     } else if (type === 'checkbox' || type === 'radio') {
-      detail = (target.checked ? 'Marcado: ' : 'Desmarcado: ') + labelFor(target);
+      detail = (target.checked ? 'Marcado: ' : 'Desmarcado: ') + label;
+      humanAction = (target.checked ? 'Marcar' : 'Desmarcar') + ' "' + label + '".';
+    } else if (tag === 'input' || tag === 'textarea') {
+      detail = 'Campo completado; el contenido no se almacena.';
+      humanAction = 'Completar el campo "' + label + '".';
     } else {
-      detail = 'Campo completado';
+      detail = 'Valor cambiado';
+      humanAction = 'Cambiar el valor de "' + label + '".';
     }
-    addStep('change', target, detail);
-  }, true);
 
-  document.addEventListener('input', (event) => {
-    if (!recording || paused) return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest('#manual-hu-toolbar') || isSensitive(target)) return;
-    const tag = target.tagName.toLowerCase();
-    const type = (target.getAttribute('type') || '').toLowerCase();
-    if (tag !== 'textarea' && tag !== 'input') return;
-    if (['checkbox','radio','button','submit','file','reset'].includes(type)) return;
-    const now = Date.now();
-    if (now - (lastInputAt.get(target) || 0) < 1200) return;
-    lastInputAt.set(target, now);
-    addStep('input', target, 'Se ingresó información en el campo; el contenido no se almacena.');
+    addStep('change', target, detail, humanAction);
   }, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -198,6 +217,7 @@
     } else if (message?.type === 'MANUAL_HU_STOP') {
       recording = false;
       paused = false;
+      removeToolbar();
       sendResponse({ ok: true, steps });
     } else if (message?.type === 'MANUAL_HU_GET_STATE') {
       sendResponse({ ok: true, recording, paused, count: steps.length });

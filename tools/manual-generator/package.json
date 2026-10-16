@@ -1,6 +1,6 @@
 {
   "name": "manual-hu-generator",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Generador de manuales profesionales a partir de ejecuciones JSON de Manual HU.",
@@ -9,7 +9,8 @@
     "docx": "node export-docx.mjs",
     "pdf": "node export-pdf.mjs",
     "all": "node export-all.mjs",
-    "ai": "node ai-editor.mjs"
+    "ai": "node ai-editor.mjs",
+    "server": "node server.mjs"
   },
   "dependencies": {
     "docx": "^9.5.1",

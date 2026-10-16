@@ -1,0 +1,26 @@
+:root { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: #172033; background: #f4f6fa; }
+* { box-sizing: border-box; }
+body { margin: 0; width: 340px; min-height: 410px; }
+.app { padding: 18px; }
+header { display:flex; align-items:center; gap:11px; margin-bottom:20px; }
+.brand-mark { display:grid; place-items:center; width:43px;height:43px;border-radius:12px;background:#164e63;color:white;font-weight:800; }
+h1 { font-size:18px; margin:0 0 3px; } p { margin:0; }
+header p { font-size:11px; color:#697386; }
+label { display:block; font-size:12px; font-weight:700; margin:12px 0 6px; }
+input { width:100%; border:1px solid #d8deea; border-radius:8px; padding:10px; outline:none; background:white; font:inherit; font-size:13px; }
+input:focus { border-color:#0e7490; box-shadow:0 0 0 3px #0e74901c; }
+.status-card { display:flex; gap:10px; align-items:center; background:white; border:1px solid #e3e8f0; border-radius:10px; padding:12px; margin:16px 0; }
+.dot { width:9px;height:9px;border-radius:50%;background:#98a2b3; flex-shrink:0; }
+.dot.active { background:#16a34a; box-shadow:0 0 0 4px #16a34a1b; }
+.dot.paused { background:#d97706; }
+.status-card strong, .status-card small { display:block; }
+.status-card strong { font-size:12px; }
+.status-card small { color:#697386; font-size:11px; margin-top:4px; }
+.actions { display:grid; gap:8px; }
+button { border:0; border-radius:8px; padding:10px 12px; font-weight:700; font-size:12px; cursor:pointer; background:#e5e9f1; color:#172033; }
+button:disabled { opacity:.45;cursor:not-allowed; }
+button.primary { background:#0e7490;color:white; }
+button.dark { background:#172033;color:white; }
+button.link { padding:10px 0 2px;background:transparent;color:#526176;text-decoration:underline;width:100%; }
+#notice { min-height:18px; margin:10px 0 2px; font-size:11px; color:#0e7490; }
+footer { border-top:1px solid #e1e6ee; padding-top:10px; margin-top:10px; color:#778195; font-size:10px; line-height:1.5; }

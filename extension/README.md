@@ -1,4 +1,4 @@
-# Probar Manual HU en Chrome — MVP 0.6
+# Probar Manual HU en Chrome — MVP 0.7
 
 ## 1. Instalar la extensión
 
@@ -18,29 +18,36 @@ npx playwright install chromium
 npm run server
 ```
 
-La terminal debe quedar abierta. El servicio local atiende en `http://127.0.0.1:8787`.
+La terminal debe quedar abierta. El servicio local atiende en `http://127.0.0.1:8787` y expone `POST /generate-pdf`.
 
 ## 3. Grabar una historia de usuario
 
 1. Abre el sistema HTTP/HTTPS que deseas documentar.
 2. Pulsa el icono **Manual HU**.
-3. Escribe el ID de la historia, por ejemplo `HU-001`, y su título.
-4. Pulsa **Iniciar grabación**.
-5. Ejecuta normalmente la historia de usuario.
-6. La barra **Manual HU** registra los pasos y captura evidencias de pantalla.
-7. Al terminar, pulsa **Finalizar y exportar**.
+3. Escribe el ID y título de la historia.
+4. En **Datos del manual**, registra cuando se conozcan: sistema de información, módulo/ruta, proceso, dependencia responsable y clasificación.
+5. Pulsa **Iniciar grabación**.
+6. Ejecuta normalmente la historia de usuario.
+7. La barra **Manual HU** registra las acciones y captura evidencias visibles.
+8. Al terminar, pulsa **Finalizar y generar PDF**.
 
-### Resultado esperado
+## 4. Plantilla institucional
 
-El resultado final debe ser un archivo:
+El PDF utiliza una estructura basada en el modelo institucional suministrado: portada, control de cambios, contenido, objetivo y alcance, usuarios y permisos, acceso al sistema, ingreso, salida, pantalla principal, funcionalidades, pasos, campos del formulario, glosario y elaboración/revisión/aprobación.
+
+Los datos que no provengan de la ejecución o que no sean suministrados en los metadatos se presentan como **No especificado**, **No determinado** o equivalentes. La generación no debe inventar roles, permisos, reglas de negocio ni resultados.
+
+## 5. Resultado esperado
+
+El resultado final es directamente:
 
 ```text
 HU-001-manual.pdf
 ```
 
-Chrome abrirá el selector de ubicación de descarga porque la extensión usa el permiso de descargas con `saveAs: true`.
+No se entrega al usuario un JSON o HTML como salida final. La ejecución JSON permanece como estructura interna enviada al servidor local para construir el documento.
 
-## 4. Si no aparece el PDF
+## 6. Si no aparece el PDF
 
 - Verifica que `npm run server` siga ejecutándose.
 - Verifica que aparezca `Manual HU PDF server activo en http://127.0.0.1:8787` en la terminal.

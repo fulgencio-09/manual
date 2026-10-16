@@ -3,9 +3,9 @@ const state = { recording: false, paused: false, count: 0, tabId: null, storyId:
 
 function showNotice(message) { $('notice').textContent = message || ''; }
 function render() {
-  $('statusText').textContent = state.recording ? (state.paused ? 'Grabación pausada' : 'Grabación activa') : 'Grabación detenida';
+  $('statusText').textContent = state.recording ? 'Grabación iniciada' : 'Grabación detenida';
   $('stepCount').textContent = state.count + (state.count === 1 ? ' paso registrado' : ' pasos registrados');
-  $('statusDot').className = 'dot' + (state.recording ? (state.paused ? ' paused' : ' active') : '');
+  $('statusDot').className = 'dot' + (state.recording ? ' active' : '');
   $('startBtn').disabled = state.recording;
   $('pauseBtn').disabled = !state.recording;
   $('pauseBtn').textContent = state.paused ? 'Reanudar' : 'Pausar';
@@ -18,9 +18,17 @@ async function activeTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
   if (!tab?.id || !/^https?:/.test(tab.url || '')) {
-    throw new Error('Abre una página HTTP o HTTPS normal. Chrome no permite grabar páginas internas.');
+    throw new Error('Abre una página HTTP o HTTPS normal.');
   }
   return tab;
+}
+
+async function ensureContentScript(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_GET_STATE' });
+  } catch {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  }
 }
 
 async function sendToTab(tabId, message) {
@@ -33,18 +41,20 @@ $('startBtn').addEventListener('click', async () => {
     const storyTitle = $('storyTitle').value.trim();
     if (!storyId || !storyTitle) { showNotice('Escribe el identificador y el título de la historia.'); return; }
     const tab = await activeTab();
+    await ensureContentScript(tab.id);
     state.tabId = tab.id;
     state.storyId = storyId;
     state.storyTitle = storyTitle;
-    await sendToTab(tab.id, { type: 'MANUAL_HU_START' });
+    await sendToTab(tab.id, { type: 'MANUAL_HU_START', storyId, storyTitle });
     state.recording = true;
     state.paused = false;
     state.count = 0;
     await chrome.storage.local.set({ currentRun: { ...state, startedAt: new Date().toISOString() } });
-    showNotice('Grabación iniciada en la pestaña actual.');
+    showNotice('Grabación iniciada. El control seguirá visible sobre la página.');
     render();
   } catch (error) {
-    showNotice('No se pudo iniciar. Recarga la página y prueba otra vez.');
+    console.error(error);
+    showNotice('No se pudo iniciar. Revisa que sea una página web HTTP/HTTPS y que la extensión tenga permisos.');
   }
 });
 
@@ -56,7 +66,7 @@ $('pauseBtn').addEventListener('click', async () => {
     showNotice(state.paused ? 'Grabación pausada.' : 'Grabación reanudada.');
     render();
   } catch {
-    showNotice('No se pudo actualizar la grabación en la pestaña.');
+    showNotice('El control de la grabación está ahora en la página.');
   }
 });
 
@@ -86,12 +96,12 @@ $('finishBtn').addEventListener('click', async () => {
     showNotice('JSON exportado con ' + steps.length + ' pasos.');
     render();
   } catch {
-    showNotice('No se pudo finalizar. Verifica que la pestaña original siga abierta y recárgala si es necesario.');
+    showNotice('Ahora puedes finalizar desde la barra flotante de la página.');
   }
 });
 
 $('clearBtn').addEventListener('click', async () => {
-  if (state.recording) {
+  if (state.recording && state.tabId) {
     try { await sendToTab(state.tabId, { type: 'MANUAL_HU_STOP' }); } catch {}
   }
   Object.assign(state, { recording: false, paused: false, count: 0, tabId: null, storyId: '', storyTitle: '' });
@@ -105,6 +115,12 @@ $('clearBtn').addEventListener('click', async () => {
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'MANUAL_HU_STEPS_UPDATED') {
     state.count = message.count || 0;
+    render();
+  }
+  if (message?.type === 'MANUAL_HU_FINISHED') {
+    state.recording = false;
+    state.count = message.count || state.count;
+    chrome.storage.local.remove('currentRun');
     render();
   }
 });

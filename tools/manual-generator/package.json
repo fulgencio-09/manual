@@ -1,0 +1,10 @@
+{
+  "name": "manual-hu-generator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generador de manuales profesionales a partir de ejecuciones JSON de Manual HU.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  }
+}

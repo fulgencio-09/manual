@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Manual HU - Grabador",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Registra pasos y evidencias de una ejecución para crear manuales profesionales por historia de usuario.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "downloads"],
   "host_permissions": ["http://*/*", "https://*/*", "http://127.0.0.1:8787/*", "http://localhost:8787/*"],
   "background": {
     "service_worker": "background.js"

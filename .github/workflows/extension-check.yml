@@ -1,0 +1,23 @@
+name: Extension Check
+
+on:
+  push:
+    branches: ["mvp/chrome-recorder"]
+  pull_request:
+    branches: ["mvp/chrome-recorder"]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate JavaScript
+        run: |
+          node --check extension/content.js
+          node --check extension/background.js
+          node --check extension/popup.js
+      - name: Validate manifest
+        run: node -e "JSON.parse(require('fs').readFileSync('extension/manifest.json','utf8')); console.log('manifest ok')"

@@ -5,14 +5,16 @@ import { chromium } from 'playwright';
 
 const input = process.argv[2];
 const output = process.argv[3] || 'manual-generado.pdf';
+const aiInput = process.argv[4] || null;
 if (!input) {
-  console.error('Uso: node export-pdf.mjs <ejecucion.json> [salida.pdf]');
+  console.error('Uso: node export-pdf.mjs <ejecucion.json> [salida.pdf] [manual-ia.json]');
   process.exit(1);
 }
 
 const outputPath = path.resolve(output);
 const htmlPath = path.join(path.dirname(outputPath), `${path.basename(outputPath, '.pdf')}.html`);
-execFileSync(process.execPath, [path.join(import.meta.dirname, 'generate.mjs'), path.resolve(input), htmlPath], { stdio: 'inherit' });
+const extra = aiInput ? [path.resolve(aiInput)] : [];
+execFileSync(process.execPath, [path.join(import.meta.dirname, 'generate.mjs'), path.resolve(input), htmlPath, ...extra], { stdio: 'inherit' });
 
 const browser = await chromium.launch({ headless: true });
 try {

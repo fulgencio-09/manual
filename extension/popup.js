@@ -5,6 +5,7 @@ function showNotice(message, isError = false) {
   $('notice').textContent = message || '';
   $('notice').style.color = isError ? '#b42318' : '#0e7490';
 }
+
 function render() {
   $('statusText').textContent = state.recording ? 'Grabación iniciada' : 'Grabación detenida';
   $('stepCount').textContent = state.count + (state.count === 1 ? ' paso registrado' : ' pasos registrados');
@@ -32,7 +33,7 @@ async function ensureContentScript(tabId) {
   try {
     const response = await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_GET_STATE' });
     if (response?.ok) return;
-  } catch (firstError) {
+  } catch (_) {
     try {
       await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
     } catch (injectError) {
@@ -51,11 +52,64 @@ async function sendToTab(tabId, message) {
   return chrome.tabs.sendMessage(tabId, message);
 }
 
+function safeFilename(value, fallback = 'historia') {
+  return (String(value || '').trim().replace(/[^a-z0-9_-]/gi, '_') || fallback).slice(0, 80);
+}
+
+function downloadJson(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function buildAiInput(report) {
+  return {
+    schemaVersion: '1.0',
+    sourceSchemaVersion: report.schemaVersion || '1.2',
+    generatedAt: new Date().toISOString(),
+    story: report.story,
+    startedAt: report.startedAt,
+    finishedAt: report.finishedAt,
+    steps: (report.steps || []).map((step) => ({
+      step: step.step,
+      action: step.action,
+      humanAction: step.humanAction,
+      detail: step.detail,
+      pageTitle: step.pageTitle,
+      element: step.element,
+      elementType: step.elementType,
+      selectorHint: step.selectorHint,
+      timestamp: step.timestamp,
+      hasEvidence: Boolean((report.evidences || []).some((evidence) => evidence.step === step.step))
+    })),
+    evidenceReferences: (report.evidences || []).map((evidence) => ({
+      step: evidence.step,
+      timestamp: evidence.timestamp,
+      pageTitle: evidence.pageTitle,
+      hasImage: Boolean(evidence.dataUrl)
+    })),
+    privacy: {
+      typedValuesIncluded: false,
+      screenshotsIncluded: false,
+      note: 'Las imágenes y los valores digitados no forman parte de esta entrada segura para IA. La evidencia original permanece en el paquete de ejecución.'
+    }
+  };
+}
+
 $('startBtn').addEventListener('click', async () => {
   try {
     const storyId = $('storyId').value.trim();
     const storyTitle = $('storyTitle').value.trim();
-    if (!storyId || !storyTitle) { showNotice('Escribe el identificador y el título de la historia.', true); return; }
+    if (!storyId || !storyTitle) {
+      showNotice('Escribe el identificador y el título de la historia.', true);
+      return;
+    }
     const tab = await activeTab();
     await ensureContentScript(tab.id);
     state.tabId = tab.id;
@@ -90,27 +144,29 @@ $('pauseBtn').addEventListener('click', async () => {
 $('finishBtn').addEventListener('click', async () => {
   try {
     const response = await sendToTab(state.tabId, { type: 'MANUAL_HU_STOP' });
-    const steps = response?.steps || [];
+    const stored = await chrome.storage.local.get('currentRun');
+    const startedAt = stored.currentRun?.startedAt || null;
+    const evidencesResponse = await chrome.runtime.sendMessage({ type: 'MANUAL_HU_GET_EVIDENCES' });
     const report = {
-      schemaVersion: '1.0',
+      schemaVersion: '1.2',
       product: 'Manual HU Chrome Recorder',
       story: { id: state.storyId, title: state.storyTitle },
-      startedAt: (await chrome.storage.local.get('currentRun')).currentRun?.startedAt || null,
+      startedAt,
       finishedAt: new Date().toISOString(),
-      steps
+      steps: response?.steps || [],
+      evidences: evidencesResponse?.evidences || []
     };
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (state.storyId.replace(/[^a-z0-9_-]/gi, '_') || 'historia') + '-ejecucion.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    const base = safeFilename(state.storyId);
+    downloadJson(base + '-ejecucion.json', report);
+    downloadJson(base + '-ia-input.json', buildAiInput(report));
+
     state.recording = false;
     state.paused = false;
-    state.count = steps.length;
+    state.count = report.steps.length;
     await chrome.storage.local.remove('currentRun');
-    showNotice('JSON exportado con ' + steps.length + ' pasos.');
+    await chrome.runtime.sendMessage({ type: 'MANUAL_HU_CLEAR_EVIDENCES' });
+    showNotice('Paquete exportado: ejecución + entrada segura para IA. El manual HTML se genera desde el control de la página.');
     render();
   } catch (error) {
     showNotice('ERROR: ' + (error?.message || String(error)), true);
@@ -119,12 +175,13 @@ $('finishBtn').addEventListener('click', async () => {
 
 $('clearBtn').addEventListener('click', async () => {
   if (state.recording && state.tabId) {
-    try { await sendToTab(state.tabId, { type: 'MANUAL_HU_STOP' }); } catch {}
+    try { await sendToTab(state.tabId, { type: 'MANUAL_HU_STOP' }); } catch (_) {}
   }
   Object.assign(state, { recording: false, paused: false, count: 0, tabId: null, storyId: '', storyTitle: '' });
   $('storyId').value = '';
   $('storyTitle').value = '';
   await chrome.storage.local.remove('currentRun');
+  await chrome.runtime.sendMessage({ type: 'MANUAL_HU_CLEAR_EVIDENCES' }).catch(() => {});
   showNotice('Ejecución local limpiada.');
   render();
 });

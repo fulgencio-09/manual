@@ -88,19 +88,71 @@
     if (toolbar) toolbar.remove();
     toolbar = document.createElement('div');
     toolbar.id = 'manual-hu-toolbar';
+    toolbar.style.position = 'fixed';
+    toolbar.style.right = '18px';
+    toolbar.style.bottom = '18px';
+    toolbar.style.zIndex = '2147483647';
     const shadow = toolbar.attachShadow({ mode: 'open' });
     shadow.innerHTML = `
       <style>
-        :host{all:initial}.box{position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#172033;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:12px;display:flex;align-items:center;gap:10px}.title{display:flex;flex-direction:column;gap:3px;min-width:145px}.title b{font-size:13px}.story{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}.status{display:flex;flex-direction:column;gap:3px;min-width:78px}.status span:first-child{font-weight:700}.status span:last-child{opacity:.7}.active{color:#86efac}.paused{color:#fbbf24}.box button{border:0;border-radius:7px;padding:8px 10px;font-weight:700;cursor:pointer;font-size:11px}.pause{background:#334155;color:white}.finish{background:#0e7490;color:white}.box button:hover{filter:brightness(1.1)}
+        :host{all:initial}
+        .box{background:#172033;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);font-family:Arial,sans-serif;font-size:12px;display:flex;align-items:center;gap:10px;user-select:none}
+        .title{display:flex;flex-direction:column;gap:3px;min-width:145px;cursor:move;touch-action:none}
+        .title b{font-size:13px}.story{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}.status{display:flex;flex-direction:column;gap:3px;min-width:78px}.status span:first-child{font-weight:700}.status span:last-child{opacity:.7}.active{color:#86efac}.paused{color:#fbbf24}
+        .box button{border:0;border-radius:7px;padding:8px 10px;font-weight:700;cursor:pointer;font-size:11px}.pause{background:#334155;color:white}.finish{background:#0e7490;color:white}.box button:hover{filter:brightness(1.1)}
+        .drag-hint{font-size:9px;opacity:.5;margin-top:1px}
       </style>
       <div class="box">
-        <div class="title"><b>● Manual HU</b><span class="story"></span></div>
+        <div class="title" title="Arrastra esta zona para mover el panel">
+          <b>● Manual HU</b>
+          <span class="story"></span>
+          <span class="drag-hint">↕ Arrastra para mover</span>
+        </div>
         <div class="status"><span class="active status-text">Grabando</span><span class="count">0 pasos</span></div>
         <button class="pause" type="button">Pausar</button>
         <button class="finish" type="button">Finalizar y exportar</button>
       </div>`;
+
     document.documentElement.appendChild(toolbar);
     shadow.querySelector('.story').textContent = story.id + ' · ' + story.title;
+
+    const titleHandle = shadow.querySelector('.title');
+    let dragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    titleHandle.addEventListener('pointerdown', (event) => {
+      dragging = true;
+      const rect = toolbar.getBoundingClientRect();
+      offsetX = event.clientX - rect.left;
+      offsetY = event.clientY - rect.top;
+      toolbar.style.left = rect.left + 'px';
+      toolbar.style.top = rect.top + 'px';
+      toolbar.style.right = 'auto';
+      toolbar.style.bottom = 'auto';
+      titleHandle.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    titleHandle.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      const width = toolbar.offsetWidth;
+      const height = toolbar.offsetHeight;
+      const maxX = Math.max(0, window.innerWidth - width);
+      const maxY = Math.max(0, window.innerHeight - height);
+      const left = Math.min(maxX, Math.max(0, event.clientX - offsetX));
+      const top = Math.min(maxY, Math.max(0, event.clientY - offsetY));
+      toolbar.style.left = left + 'px';
+      toolbar.style.top = top + 'px';
+    });
+
+    titleHandle.addEventListener('pointerup', (event) => {
+      dragging = false;
+      titleHandle.releasePointerCapture?.(event.pointerId);
+    });
+    titleHandle.addEventListener('pointercancel', () => { dragging = false; });
+
     shadow.querySelector('.pause').addEventListener('click', (event) => {
       event.stopPropagation();
       paused = !paused;
@@ -108,6 +160,7 @@
       shadow.querySelector('.status-text').textContent = paused ? 'Pausado' : 'Grabando';
       shadow.querySelector('.status-text').className = paused ? 'paused status-text' : 'active status-text';
     });
+
     shadow.querySelector('.finish').addEventListener('click', (event) => {
       event.stopPropagation();
       finishAndExport();
@@ -193,8 +246,7 @@
     }
 
     const clickable = target.closest('button,a,[role="button"],[role="tab"],[role="menuitem"],[role="option"]');
-    if (!clickable) return;
-    if (isSensitive(clickable)) return;
+    if (!clickable || isSensitive(clickable)) return;
 
     const label = labelFor(clickable) || 'elemento';
     addStep('click', clickable, 'Clic realizado sobre ' + label + '.', 'Hacer clic en "' + label + '".');

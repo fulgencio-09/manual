@@ -1,7 +1,10 @@
 const $ = (id) => document.getElementById(id);
 const state = { recording: false, paused: false, count: 0, tabId: null, storyId: '', storyTitle: '' };
 
-function showNotice(message) { $('notice').textContent = message || ''; }
+function showNotice(message, isError = false) {
+  $('notice').textContent = message || '';
+  $('notice').style.color = isError ? '#b42318' : '#0e7490';
+}
 function render() {
   $('statusText').textContent = state.recording ? 'Grabación iniciada' : 'Grabación detenida';
   $('stepCount').textContent = state.count + (state.count === 1 ? ' paso registrado' : ' pasos registrados');
@@ -17,17 +20,30 @@ function render() {
 async function activeTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
-  if (!tab?.id || !/^https?:/.test(tab.url || '')) {
-    throw new Error('Abre una página HTTP o HTTPS normal.');
+  if (!tab?.id) throw new Error('No se encontró la pestaña activa.');
+  const url = tab.url || '';
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error('La pestaña activa no es HTTP/HTTPS. URL detectada: ' + (url || 'sin URL'));
   }
   return tab;
 }
 
 async function ensureContentScript(tabId) {
   try {
-    await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_GET_STATE' });
-  } catch {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_GET_STATE' });
+    if (response?.ok) return;
+  } catch (firstError) {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    } catch (injectError) {
+      throw new Error('Chrome no permitió inyectar el grabador: ' + (injectError?.message || String(injectError)));
+    }
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, { type: 'MANUAL_HU_GET_STATE' });
+      if (!response?.ok) throw new Error('El grabador no respondió después de la inyección.');
+    } catch (secondError) {
+      throw new Error('El grabador no respondió. Recarga la página y vuelve a intentarlo. Detalle: ' + (secondError?.message || String(secondError)));
+    }
   }
 }
 
@@ -39,7 +55,7 @@ $('startBtn').addEventListener('click', async () => {
   try {
     const storyId = $('storyId').value.trim();
     const storyTitle = $('storyTitle').value.trim();
-    if (!storyId || !storyTitle) { showNotice('Escribe el identificador y el título de la historia.'); return; }
+    if (!storyId || !storyTitle) { showNotice('Escribe el identificador y el título de la historia.', true); return; }
     const tab = await activeTab();
     await ensureContentScript(tab.id);
     state.tabId = tab.id;
@@ -53,8 +69,9 @@ $('startBtn').addEventListener('click', async () => {
     showNotice('Grabación iniciada. El control seguirá visible sobre la página.');
     render();
   } catch (error) {
-    console.error(error);
-    showNotice('No se pudo iniciar. Revisa que sea una página web HTTP/HTTPS y que la extensión tenga permisos.');
+    console.error('Manual HU:', error);
+    showNotice('ERROR: ' + (error?.message || String(error)), true);
+    render();
   }
 });
 
@@ -65,8 +82,8 @@ $('pauseBtn').addEventListener('click', async () => {
     await chrome.storage.local.set({ currentRun: state });
     showNotice(state.paused ? 'Grabación pausada.' : 'Grabación reanudada.');
     render();
-  } catch {
-    showNotice('El control de la grabación está ahora en la página.');
+  } catch (error) {
+    showNotice('ERROR: ' + (error?.message || String(error)), true);
   }
 });
 
@@ -95,8 +112,8 @@ $('finishBtn').addEventListener('click', async () => {
     await chrome.storage.local.remove('currentRun');
     showNotice('JSON exportado con ' + steps.length + ' pasos.');
     render();
-  } catch {
-    showNotice('Ahora puedes finalizar desde la barra flotante de la página.');
+  } catch (error) {
+    showNotice('ERROR: ' + (error?.message || String(error)), true);
   }
 });
 
